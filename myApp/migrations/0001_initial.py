@@ -146,4 +146,49 @@ class Migration(migrations.Migration):
                 'db_table': 'company',
             },
         ),
+        migrations.CreateModel(
+            name='Application',
+            fields=[
+                ('id', models.AutoField(primary_key=True, serialize=False, verbose_name='id')),
+                ('status', models.CharField(
+                    choices=[('pending', '待处理'), ('viewed', '已查看'), ('interviewing', '面试中'),
+                             ('finalPass', '面试通过'), ('hired', '已录用'), ('archived', '已淘汰')], default='pending',
+                    max_length=20, verbose_name='状态')),
+                ('applyTime', models.DateTimeField(auto_now_add=True, verbose_name='投递时间')),
+                ('viewTime', models.DateTimeField(blank=True, null=True, verbose_name='查看时间')),
+                ('interviewTime', models.DateTimeField(blank=True, null=True, verbose_name='面试时间')),
+                ('feedback', models.TextField(default='', verbose_name='面试评价')),
+                ('tags', models.CharField(default='', max_length=255, verbose_name='标签')),
+                ('job', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='applications',
+                                          to='myApp.joblist', verbose_name='岗位')),
+                ('user', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='applications',
+                                           to='myApp.user', verbose_name='求职者')),
+                ('employer', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='applications',
+                                               to='myApp.employer', verbose_name='招聘者'))
+            ],
+            options={
+                'db_table': 'application',
+            },
+        ),
+        migrations.CreateModel(
+            name='InterviewStage',
+            fields=[
+                ('id', models.AutoField(primary_key=True, serialize=False, verbose_name='id')),
+                ('stage',
+                 models.CharField(choices=[('initial', '初试'), ('retest', '复试'), ('final', '终试')], max_length=20,
+                                  verbose_name='面试阶段')),
+                ('time', models.DateTimeField(blank=True, null=True, verbose_name='面试时间')),
+                ('data', models.TextField(default='', help_text='面试官、地点、联系方式等', verbose_name='面试安排详情')),
+                ('comment', models.TextField(default='', verbose_name='面试评价')),
+                ('passed', models.IntegerField(default='', verbose_name='是否通过')),
+                ('createTime', models.DateTimeField(auto_now_add=True, verbose_name='创建时间')),
+                ('application', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='stages',
+                                                  to='myApp.application', verbose_name='application'))
+            ],
+            options={
+                'db_table': 'interview',
+                'ordering': ['createTime'],
+            },
+        ),
+
     ]

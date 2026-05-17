@@ -172,3 +172,52 @@ class Industry(models.Model):
         else:
             self.level = 0
         super().save(*args, **kwargs)
+
+
+class InterviewStage(models.Model):
+    STAGE_CHOICES = [
+        ('initial', '初试'),
+        ('retest', '复试'),
+        ('final', '终试'),
+    ]
+
+    id = models.AutoField('id', primary_key=True)
+    application = models.ForeignKey('Application', on_delete=models.CASCADE, related_name='stages')
+    stage = models.CharField('面试阶段', max_length=20, choices=STAGE_CHOICES)
+    time = models.DateTimeField('面试时间', null=True, blank=True)
+    data = models.TextField('面试安排详情', default='', help_text='面试官、地点、联系方式等')
+    comment = models.TextField('面试评价', default='')
+    passed = models.IntegerField('是否通过', null=True, blank=True, default=None)
+    createTime = models.DateTimeField('创建时间', auto_now_add=True)
+
+    class Meta:
+        db_table = 'interview'
+        ordering = ['createTime']
+
+    def __str__(self):
+        return f"{self.application.id} - {self.get_stage_display()}"
+
+
+class Application(models.Model):
+    STATUS_CHOICES = [
+        ('pending', '待处理'),
+        ('viewed', '已查看'),
+        ('interviewing', '面试中'),
+        ('finalPass', '面试通过'),
+        ('hired', '已录用'),
+        ('archived', '已淘汰'),
+    ]
+
+    id = models.AutoField('id', primary_key=True)
+    job = models.ForeignKey(Joblist, on_delete=models.CASCADE, related_name='applications', verbose_name='岗位')
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='applications', verbose_name='求职者')
+    status = models.CharField('状态', max_length=20, choices=STATUS_CHOICES, default='pending')
+    employer = models.ForeignKey(Employer, on_delete=models.CASCADE, related_name='applications', verbose_name='招聘者')
+    applyTime = models.DateTimeField('投递时间', auto_now_add=True)
+    viewTime = models.DateTimeField('查看时间', null=True, blank=True)
+    interviewTime = models.DateTimeField('面试时间', null=True, blank=True)
+    feedback = models.TextField('面试评价', default='')
+    tags = models.CharField('标签', max_length=255, default='')
+
+    class Meta:
+        db_table = 'application'
