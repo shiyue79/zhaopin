@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Neon Admin Panel">
+    <meta name="author" content="">
+    <title>修改密码</title>
+    <link rel="stylesheet" href="/static/css/jquery-ui-1.10.3.custom.min.css">
+    <link rel="stylesheet" href="/static/css/entypo.css">
+    <link rel="stylesheet" href="/static/css/css.css">
+    <link rel="stylesheet" href="/static/css/bootstrap.css">
+    <link rel="stylesheet" href="/static/css/neon-core.css">
+    <link rel="stylesheet" href="/static/css/neon-theme.css">
+    <link rel="stylesheet" href="/static/css/neon-forms.css">
+    <link rel="stylesheet" href="/static/css/custom.css">
+    <script src="/static/js/jquery-1.11.0.min.js"></script>
+</head>
+<body class="page-body  page-left-in" data-url="http://neon.dev">
+<div class="page-container">
+    <!-- add class "sidebar-collapsed" to close sidebar by default, "chat-visible" to make chat appear always -->
+    <div class="sidebar-menu">
+        <header class="logo-env">
+            <div class="logo">
+                <a href="/myApp/home">
+                    <h3 style="color: #fff;font-width: bold;display: flex">招聘信息可视化</h3>
+                </a>
+            </div>
+        </header>
+        <div class="sidebar-user-info">
+            <div class="sui-normal">
+                <a href="#" class="user-link">
+                    <img style="width: 200px; height: 200px;border-radius: 50%;object-fit: cover;" src="/media/{{ userInfo.avatar }}" alt="">
+                    <span style="text-align: center;padding-top: 209px">welcome，</span>
+                    <strong style="text-align: center;margin-top: 5px">{{ userInfo.username }}</strong>
+                </a>
+            </div>
+        </div>
+
+        <ul id="main-menu" class="">
+            <li>
+                <a href="/myApp/tableData/">
+                    <i class="entypo-monitor"></i>
+                    <span>岗位推荐</span>
+                </a>
+            </li>
+            <li>
+                <a href="#">
+                    <i class="entypo-user"></i>
+                    <span>个人中心</span>
+                </a>
+                <ul>
+                    <li>
+                        <a href="/myApp/selfInfo">
+                            <span>个人中心</span>
+                        </a>
+                    </li>
+                    <li>
+                        <a href="/myApp/changePassword">
+                            <span>修改密码</span>
+                        </a>
+                    </li>
+                </ul>
+            </li>
+            <li>
+                <a href="#">
+                    <i class="entypo-chart-bar"></i>
+                    <span>可视化图表</span>
+                </a>
+                <ul>
+                    <li>
+                        <a href="/myApp/salary/">
+                            <i class="entypo-credit-card"></i>
+                            <span>薪资情况</span>
+                        </a>
+                    </li>
+                    <li>
+                        <a href="/myApp/company/">
+                            <i class="entypo-briefcase"></i>
+                            <span>企业情况</span>
+                        </a>
+                    </li>
+                </ul>
+            </li>
+        </ul>
+    </div>
+    <div class="main-content">
+        <div class="row" style="display:flex;">
+            <div class="col-md-6 col-sm-4 clearfix hidden-xs" style="margin-left: auto;">
+                <ul class="list-inline links-list pull-right">
+                    <li class="sep"></li>
+                    <li>
+                        <a href="/myApp/logout/">
+                            退出登陆<i class="entypo-logout right"></i>
+                        </a>
+                    </li>
+                </ul>
+            </div>
+        </div>
+        <hr>
+        <ol class="breadcrumb bc-3">
+            <li>
+                <a href="#">
+                    <i class="entypo-folder"></i>
+                    个人中心
+                </a>
+            </li>
+            <li class="active">
+                <strong>修改密码</strong>
+            </li>
+        </ol>
+        <h2>修改密码</h2>
+        <br>
+        <div class="row">
+            <div class="col-md-12">
+                <div class="panel panel-primary" data-collapsed="0">
+                    <div class="panel-body">
+                        <form role="form" method="post" action="/myApp/changePassword/"
+                              class="form-horizontal form-groups-bordered">
+                            <div class="form-group">
+                                <label for="field-1" class="col-sm-3 control-label">用户名</label>
+                                <div class="col-sm-5">
+                                    <input type="text" name="username" class="form-control" readonly
+                                           value="{{ userInfo.username }}"
+                                           id="field-1">
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label for="field-1" class="col-sm-3 control-label">原始密码</label>
+                                <div class="col-sm-5">
+                                    <input type="password" name="oldPwd" class="form-control"
+                                           id="field-1" placeholder="请输入原始密码">
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label for="field-1" class="col-sm-3 control-label">新密码</label>
+                                <div class="col-sm-5">
+                                    <input type="password" name="newPwd" class="form-control"
+                                           id="field-1" placeholder="请输入新密码">
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label for="field-1" class="col-sm-3 control-label">确认新密码</label>
+                                <div class="col-sm-5">
+                                    <input type="password" name="checkPwd" class="form-control"
+                                           id="field-1" placeholder="请确认新密码">
+                                </div>
+                            </div>
+                    {% if errorRes %}
+                        <div class="form-group">
+                        <div class="alert alert-danger">
+                            {{ errorRes }}
+                        </div>
+                        </div>
+                    {% endif %}
+                            <div class="form-group">
+                                <div class="col-sm-offset-3 col-sm-5">
+                                    <button type="submit" class="btn btn-success">提交</button>
+                                </div>
+                            </div>
+                        </form>
+
+                    </div>
+
+                </div>
+
+            </div>
+        </div>
+    </div>
+</div>
+
+
+<link rel="stylesheet" href="/static/css/jquery-jvectormap-1.2.2.css">
+<link rel="stylesheet" href="/static/css/rickshaw.min.css">
+<!-- Bottom Scripts -->
+<script src="/static/js/main-gsap.js"></script>
+<script src="/static/js/jquery-ui-1.10.3.minimal.min.js"></script>
+<script src="/static/js/bootstrap.js"></script>
+<script src="/static/js/joinable.js"></script>
+<script src="/static/js/resizeable.js"></script>
+<script src="/static/js/neon-api.js"></script>
+<script src="/static/js/jquery-jvectormap-1.2.2.min.js"></script>
+<script src="/static/js/jquery-jvectormap-europe-merc-en.js"></script>
+<script src="/static/js/jquery-jvectormap-world-mill-en.js"></script>
+<script src="/static/js/jquery.sparkline.min.js"></script>
+<script src="/static/js/d3.v3.js"></script>
+<script src="/static/js/rickshaw.min.js"></script>
+<script src="/static/js/neon-chat.js"></script>
+<script src="/static/js/neon-custom.js"></script>
+<script src="/static/js/neon-demo.js"></script>
+<script src="/static/js/fileinput.js"></script>
+</body>
+</html>

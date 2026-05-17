@@ -1,0 +1,575 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Neon Admin Panel">
+    <meta name="author" content="">
+    <title>薪资情况</title>
+    <link rel="stylesheet" href="/static/css/jquery-ui-1.10.3.custom.min.css">
+    <link rel="stylesheet" href="/static/css/entypo.css">
+    <link rel="stylesheet" href="/static/css/css.css">
+    <link rel="stylesheet" href="/static/css/bootstrap.css">
+    <link rel="stylesheet" href="/static/css/neon-core.css">
+    <link rel="stylesheet" href="/static/css/neon-theme.css">
+    <link rel="stylesheet" href="/static/css/neon-forms.css">
+    <link rel="stylesheet" href="/static/css/custom.css">
+    <script src="/static/js/jquery-1.11.0.min.js"></script>
+</head>
+<body class="page-body  page-left-in" data-url="http://neon.dev">
+<div class="page-container">
+    <!-- add class "sidebar-collapsed" to close sidebar by default, "chat-visible" to make chat appear always -->
+    <div class="sidebar-menu">
+        <header class="logo-env">
+            <div class="logo">
+                <a href="/myApp/home">
+                    <h3 style="color: #fff;font-width: bold;display: flex">招聘信息可视化</h3>
+                </a>
+            </div>
+        </header>
+        <div class="sidebar-user-info">
+            <div class="sui-normal">
+                <a href="#" class="user-link">
+                    <img style="width: 200px; height: 200px;border-radius: 50%;object-fit: cover;"
+                         src="/media/{{ userInfo.avatar }}" alt="">
+                    <span style="text-align: center;padding-top: 209px">welcome，</span>
+                    <strong style="text-align: center;margin-top: 5px">{{ userInfo.username }}</strong>
+                </a>
+            </div>
+        </div>
+
+        <ul id="main-menu" class="">
+            <li>
+                <a href="/myApp/tableData/">
+                    <i class="entypo-monitor"></i>
+                    <span>岗位推荐</span>
+                </a>
+            </li>
+            <li>
+                <a href="#">
+                    <i class="entypo-user"></i>
+                    <span>个人中心</span>
+                </a>
+                <ul>
+                    <li>
+                        <a href="/myApp/selfInfo">
+                            <span>个人中心</span>
+                        </a>
+                    </li>
+                    <li>
+                        <a href="/myApp/changePassword">
+                            <span>修改密码</span>
+                        </a>
+                    </li>
+                </ul>
+            </li>
+            <li>
+                <a href="#">
+                    <i class="entypo-chart-bar"></i>
+                    <span>可视化图表</span>
+                </a>
+                <ul>
+                    <li>
+                        <a href="/myApp/salary/">
+                            <i class="entypo-credit-card"></i>
+                            <span>薪资情况</span>
+                        </a>
+                    </li>
+                    <li>
+                        <a href="/myApp/company/">
+                            <i class="entypo-briefcase"></i>
+                            <span>企业情况</span>
+                        </a>
+                    </li>
+                </ul>
+            </li>
+        </ul>
+    </div>
+    <div class="main-content">
+        <div class="row" style="display:flex;">
+            <div class="col-md-6 col-sm-4 clearfix hidden-xs" style="margin-left: auto;">
+                <ul class="list-inline links-list pull-right">
+                    <li class="sep"></li>
+                    <li>
+                        <a href="/myApp/logout/">
+                            退出登陆<i class="entypo-logout right"></i>
+                        </a>
+                    </li>
+                </ul>
+            </div>
+        </div>
+        <hr>
+        <ol class="breadcrumb bc-3">
+            <li>
+                <a href="#">
+                    <i class="entypo-folder"></i>
+                    可视化图表
+                </a>
+            </li>
+            <li class="active">
+                <strong>薪资情况</strong>
+            </li>
+        </ol>
+        <h2>薪资情况</h2>
+        <br>
+        <div class="row">
+            <div class="col-md-12">
+                <div class="panel panel-default panel-shadow" data-collapsed="0">
+                    <div class="panel-heading">
+                        <div class="panel-title">不同学历的薪资状况</div>
+                        <div class="panel-options">
+                            <a href="#" data-rel="collapse"><i class="entypo-down-open"></i></a>
+                            <a href="#" data-rel="close"><i class="entypo-cancel"></i></a>
+                        </div>
+                    </div>
+                    <div class="panel-body">
+                        <div id="mainOne" style="width: 100% ;height: 500px;">
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-12">
+                <div class="panel panel-default panel-shadow" data-collapsed="0">
+                    <div class="panel-heading">
+                        <div class="panel-title">不同经验的薪资状况</div>
+                        <div class="panel-options">
+                            <a href="#" data-rel="collapse"><i class="entypo-down-open"></i></a>
+                            <a href="#" data-rel="close"><i class="entypo-cancel"></i></a>
+                        </div>
+                    </div>
+                    <div class="panel-body">
+                        <div id="mainTwo" style="width: 100% ;height: 500px;">
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="panel panel-default panel-shadow" data-collapsed="0">
+                    <div class="panel-heading">
+                        <div class="panel-title">年底多薪</div>
+                        <div class="panel-options">
+                            <a href="#" data-rel="collapse"><i class="entypo-down-open"></i></a>
+                            <a href="#" data-rel="close"><i class="entypo-cancel"></i></a>
+                        </div>
+                    </div>
+                    <div class="panel-body">
+                        <div id="mainThree" style="width: 100% ;height: 500px;">
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="panel panel-default panel-shadow" data-collapsed="0">
+                    <div class="panel-heading">
+                        <div class="panel-title">岗位要求</div>
+                        <div class="panel-options">
+                            <a href="#" data-rel="collapse"><i class="entypo-down-open"></i></a>
+                            <a href="#" data-rel="close"><i class="entypo-cancel"></i></a>
+                        </div>
+                    </div>
+                    <div class="panel-body">
+                        <img src="/static/key_cloud.png" alt="" style="width: 90%" >
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+</div>
+
+
+<link rel="stylesheet" href="/static/css/jquery-jvectormap-1.2.2.css">
+<link rel="stylesheet" href="/static/css/rickshaw.min.css">
+<!-- Bottom Scripts -->
+<script src="/static/js/main-gsap.js"></script>
+<script src="/static/js/jquery-ui-1.10.3.minimal.min.js"></script>
+<script src="/static/js/bootstrap.js"></script>
+<script src="/static/js/joinable.js"></script>
+<script src="/static/js/resizeable.js"></script>
+<script src="/static/js/neon-api.js"></script>
+<script src="/static/js/jquery-jvectormap-1.2.2.min.js"></script>
+<script src="/static/js/jquery-jvectormap-europe-merc-en.js"></script>
+<script src="/static/js/jquery-jvectormap-world-mill-en.js"></script>
+<script src="/static/js/jquery.sparkline.min.js"></script>
+<script src="/static/js/d3.v3.js"></script>
+<script src="/static/js/rickshaw.min.js"></script>
+<script src="/static/js/neon-chat.js"></script>
+<script src="/static/js/neon-custom.js"></script>
+<script src="/static/js/neon-demo.js"></script>
+<script src="/static/js/fileinput.js"></script>
+<script src="/static/js/echarts.min.js"></script>
+<script>
+    var chartDom = document.getElementById('mainOne');
+    var myChart = echarts.init(chartDom);
+    var option;
+    var barData = {{ barData|safe }};
+    option = {
+        color: ['#fa8c16', '#faad14', '#fadb14', '#a0d911', '#52c41a', '#13c2c2'],
+        tooltip: {
+            trigger: 'axis',
+            axisPointer: {
+                type: 'cross',
+                crossStyle: {
+                    color: '#999'
+                }
+            }
+        },
+        toolbox: {
+            feature: {
+                dataView: {show: true, readOnly: false},
+                restore: {show: true},
+                saveAsImage: {show: true}
+            }
+        },
+        legend: {
+            data: {{ lineData|safe }}
+        },
+        xAxis: [
+            {
+                type: 'category',
+                name: '学历',
+                data: {{ educations|safe }},
+                position: 'top',
+                axisPointer: {
+                    type: 'shadow'
+                },
+                axisTick: {
+                    alignWithLabel: true
+                },
+                nameTextStyle: {
+                    padding: [40, 20, 0, 0]
+                }
+            },
+            {
+                type: 'category',
+                data: [
+                    {% for edu in educations %}
+                        {% for exp in workExp %}
+                            '{{ exp }}',
+                        {% endfor %}
+                    {% endfor %}
+                ],
+                position: 'bottom',
+                axisPointer: {
+                    type: 'shadow'
+                },
+                axisLabel: {
+                    interval: 0,
+                    rotate: 30,
+                    fontSize: 10,
+                    margin: 10
+                },
+                axisTick: {
+                    alignWithLabel: true
+                }
+            }
+        ],
+        yAxis: [
+            {
+                type: 'value',
+                name: '岗位数量(个)',
+                position: 'left',
+                nameTextStyle: {
+                    padding: [0, 40, 0, 0]
+                }
+            },
+            {
+                type: 'value',
+                name: '薪资(元)',
+                position: 'right',
+                axisLabel: {
+                    formatter: '¥{value}'
+                },
+                nameTextStyle: {
+                    padding: [0, 0, 0, 40]
+                }
+            }
+
+        ],
+        series: [
+            {% for exp in workExp %}
+                {
+                    name: '{{ exp }}',
+                    type: 'bar',
+                    xAxisIndex: 0,
+                    yAxisIndex: 0,
+                    data: [
+                        {% for edu in educations %}
+                            (barData['{{ edu }}'] && barData['{{ edu }}']['{{ exp }}']) ?
+                                barData['{{ edu }}']['{{ exp }}'].count : 0,
+                        {% endfor %}
+                    ],
+                    barWidth: '13%'
+                },
+            {% endfor %}
+            {
+                name: '最低薪资',
+                type: 'line',
+                xAxisIndex: 1,
+                yAxisIndex: 1,
+                data: [
+                    {% for edu in educations %}
+                        {% for exp in workExp %}
+                            (barData['{{ edu }}'] && barData['{{ edu }}']['{{ exp }}']) ?
+                                barData['{{ edu }}']['{{ exp }}'].minSalaries : 0,
+                        {% endfor %}
+                    {% endfor %}
+                ],
+                smooth: true
+            },
+            {
+                name: '平均薪资',
+                type: 'line',
+                xAxisIndex: 1,
+                yAxisIndex: 1,
+                data: [
+                    {% for edu in educations %}
+                        {% for exp in workExp %}
+                            (barData['{{ edu }}'] && barData['{{ edu }}']['{{ exp }}']) ?
+                                barData['{{ edu }}']['{{ exp }}'].avg : 0,
+                        {% endfor %}
+                    {% endfor %}
+                ],
+                smooth: true
+            },
+            {
+                name: '最高薪资',
+                type: 'line',
+                xAxisIndex: 1,
+                yAxisIndex: 1,
+                data: [
+                    {% for edu in educations %}
+                        {% for exp in workExp %}
+                            (barData['{{ edu }}'] && barData['{{ edu }}']['{{ exp }}']) ?
+                                barData['{{ edu }}']['{{ exp }}'].maxSalaries : 0,
+                        {% endfor %}
+                    {% endfor %}
+                ],
+                smooth: true
+            }
+        ]
+    };
+    option && myChart.setOption(option);
+</script>
+<script>
+    var chartDom = document.getElementById('mainTwo');
+    var myChart = echarts.init(chartDom);
+    var option;
+    var barData = {{ barData|safe }};
+    option = {
+        color: ['#1890ff', '#722ed1', '#eb2f96', '#f5222d', '#fa8c16', '#fadb14'],
+        tooltip: {
+            trigger: 'axis',
+            axisPointer: {
+                type: 'cross',
+                crossStyle: {
+                    color: '#999'
+                }
+            }
+        },
+        toolbox: {
+            feature: {
+                dataView: {show: true, readOnly: false},
+                restore: {show: true},
+                saveAsImage: {show: true}
+            }
+        },
+        legend: {
+            data: {{ lineDa|safe }}
+        },
+        xAxis: [
+            {
+                type: 'category',
+                name: '经验',
+                data: {{ workExp|safe }},
+                position: 'top',
+                axisPointer: {
+                    type: 'shadow'
+                },
+                axisTick: {
+                    alignWithLabel: true
+                },
+                nameTextStyle: {
+                    padding: [40, 20, 0, 0]
+                }
+            },
+            {
+                type: 'category',
+                data: [
+                    {% for exp in workExp %}
+                        {% for edu in educations %}
+                            '{{ edu }}',
+                        {% endfor %}
+                    {% endfor %}
+                ],
+                position: 'bottom',
+                axisPointer: {
+                    type: 'shadow'
+                },
+                axisLabel: {
+                    interval: 0,
+                    rotate: 30,
+                    fontSize: 10,
+                    margin: 10
+                },
+                axisTick: {
+                    alignWithLabel: true
+                }
+            }
+        ],
+        yAxis: [
+            {
+                type: 'value',
+                name: '岗位数量(个)',
+                position: 'left',
+                nameTextStyle: {
+                    padding: [0, 40, 0, 0]
+                }
+            },
+            {
+                type: 'value',
+                name: '薪资(元)',
+                position: 'right',
+                axisLabel: {
+                    formatter: '¥{value}'
+                },
+                nameTextStyle: {
+                    padding: [0, 0, 0, 40]
+                }
+            }
+
+        ],
+        series: [
+            {% for edu in educations %}
+                {
+                    name: '{{ edu }}',
+                    type: 'bar',
+                    xAxisIndex: 0,
+                    yAxisIndex: 0,
+                    data: [
+                        {% for exp in workExp %}
+                            (barData['{{ edu }}'] && barData['{{ edu }}']['{{ exp }}']) ?
+                                barData['{{ edu }}']['{{ exp }}'].count : 0,
+                        {% endfor %}
+                    ],
+                    barWidth: '9.5%'
+                },
+            {% endfor %}
+            {
+                name: '最低薪资',
+                type: 'line',
+                xAxisIndex: 1,
+                yAxisIndex: 1,
+                data: [
+                    {% for exp in workExp %}
+                        {% for edu in educations %}
+                            (barData['{{ edu }}'] && barData['{{ edu }}']['{{ exp }}']) ?
+                                barData['{{ edu }}']['{{ exp }}'].minSalaries : 0,
+                        {% endfor %}
+                    {% endfor %}
+                ],
+                smooth: true
+            },
+            {
+                name: '平均薪资',
+                type: 'line',
+                xAxisIndex: 1,
+                yAxisIndex: 1,
+                data: [
+                    {% for exp in workExp %}
+                        {% for edu in educations %}
+                            (barData['{{ edu }}'] && barData['{{ edu }}']['{{ exp }}']) ?
+                                barData['{{ edu }}']['{{ exp }}'].avg : 0,
+                        {% endfor %}
+                    {% endfor %}
+                ],
+                smooth: true
+            },
+            {
+                name: '最高薪资',
+                type: 'line',
+                xAxisIndex: 1,
+                yAxisIndex: 1,
+                data: [
+                    {% for exp in workExp %}
+                        {% for edu in educations %}
+                            (barData['{{ edu }}'] && barData['{{ edu }}']['{{ exp }}']) ?
+                                barData['{{ edu }}']['{{ exp }}'].maxSalaries : 0,
+                        {% endfor %}
+                    {% endfor %}
+                ],
+                smooth: true
+            }
+        ]
+    };
+    option && myChart.setOption(option);
+</script>
+<script>
+    var chartDom = document.getElementById('mainThree');
+    var myChart = echarts.init(chartDom);
+    var option;
+    var bonusData = {{ BonusData|safe }};
+    var maxCount = Math.max(...bonusData.map(item => item.value));
+    option = {
+        title: {
+            text: '年底多薪漏斗图'
+        },
+        tooltip: {
+            trigger: 'item',
+            formatter: '{a} <br/>{b} : {c} 个'
+        },
+        toolbox: {
+            feature: {
+                dataView: {readOnly: false},
+                restore: {},
+                saveAsImage: {}
+            }
+        },
+        legend: {
+            top: '5%',
+            left: 'center'
+        },
+        series: [
+            {
+                name: '年底多薪岗位数',
+                type: 'funnel',
+                left: '10%',
+                top: '20%',
+                bottom: 10,
+                width: '80%',
+                min: 0,
+                max: maxCount,
+                minSize: '0%',
+                maxSize: '100%',
+                sort: 'descending',
+                gap: 2,
+                label: {
+                    show: true,
+                    position: 'inside'
+                },
+                labelLine: {
+                    length: 10,
+                    lineStyle: {
+                        width: 1,
+                        type: 'solid'
+                    }
+                },
+                itemStyle: {
+                    borderColor: '#fff',
+                    borderWidth: 1
+                },
+                emphasis: {
+                    label: {
+                        fontSize: 20
+                    }
+                },
+                data: bonusData
+            }
+        ]
+    };
+    option && myChart.setOption(option);
+</script>
+</body>
+</html>
