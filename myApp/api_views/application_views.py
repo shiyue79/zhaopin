@@ -409,7 +409,7 @@ class ApplicationViewSet(viewsets.ViewSet):
 
             # 1. 优先检查岗位人数是否已满
             if job.num <= 0:
-                job.status = '关闭'
+                job.status = 'closed'
                 job.save()
                 return JsonResponse({
                     'code': 400,

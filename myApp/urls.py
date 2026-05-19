@@ -7,7 +7,8 @@ from .api_views import (
     EmployerViewSet,
     ApplicationViewSet,
     TalentViewSet,
-    IndustryViewSet
+    IndustryViewSet,
+    MessageViewSet
 )
 
 router = DefaultRouter()
@@ -17,6 +18,7 @@ router.register(r'employer', EmployerViewSet, basename='employer')
 router.register(r'applications', ApplicationViewSet, basename='application')
 router.register(r'talents', TalentViewSet, basename='talent')
 router.register(r'industry', IndustryViewSet, basename='industry')
+router.register(r'chat', MessageViewSet, basename='message')
 
 urlpatterns = [
     path('', include(router.urls)),

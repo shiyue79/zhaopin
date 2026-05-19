@@ -10,6 +10,7 @@ from ..serializers import JobSerializer
 import hashlib
 from ..utils import getTableData, getCompanyInfo
 
+
 class JobViewSet(viewsets.ViewSet):
     permission_classes = [permissions.AllowAny]
 
@@ -25,60 +26,142 @@ class JobViewSet(viewsets.ViewSet):
 
         try:
             userInfo = User.objects.get(username=username)
-            pageData = getTableData.getDefaultData(username, request)
-            query_params = {
-                'work': pageData.get('defaultWork', ''),
-                'city': pageData.get('defaultCity', ''),
-                'education': pageData.get('defaultEdu', '不限'),
-                'experience': pageData.get('defaultExp', '不限'),
-                'salary': pageData.get('defaultSalary', ''),
-            }
-            cache_key = f"table_data_{username}_{hashlib.md5(str(query_params).encode()).hexdigest()}"
-            jobs = cache.get(cache_key)
-            if jobs is None:
-                jobs = getTableData.getTableData(username, pageData)
-                cache.set(cache_key, jobs, 1800)
 
-            paginator = Paginator(jobs, 10)
-            cur_page = 1
-            if request.GET.get('page'):
-                cur_page = int(request.GET.get('page'))
+            # 获取筛选参数
+            work = request.GET.get('work', '')
+            city = request.GET.get('city', '')
+            industry = request.GET.get('industry', '')
+            education = request.GET.get('education', '不限')
+            experience = request.GET.get('experience', '不限')
+            salary_min = request.GET.get('salaryMin', '')
+            company_size = request.GET.get('companySize', '')
+            job_types = request.GET.get('jobTypes', '')
 
-            # 确保页码在有效范围内
-            if cur_page < 1:
-                cur_page = 1
-            elif cur_page > paginator.num_pages:
-                cur_page = paginator.num_pages
+            # 分页参数
+            current_page = int(request.GET.get('current', request.GET.get('page', 1)))
+            page_size = int(request.GET.get('size', request.GET.get('pageSize', 10)))
 
-            c_page = paginator.page(cur_page)
+            # 构建查询条件
+            from django.db.models import Q
+            filters = Q(delete=0)
+
+            if work:
+                filters &= Q(name__icontains=work) | Q(keyList__icontains=work)
+            if city:
+                filters &= Q(city__icontains=city)
+            if industry:
+                filters &= Q(industry=industry)
+            if education and education != '不限':
+                filters &= Q(edu=education)
+            if experience and experience != '不限':
+                filters &= Q(exp=experience)
+            if salary_min:
+                try:
+                    filters &= Q(salaryMin__gte=float(salary_min))
+                except ValueError:
+                    pass
+            if company_size:
+                filters &= Q(comSize=company_size)
+            if job_types:
+                # 多选，用逗号分隔
+                types_list = job_types.split(',')
+                type_filter = Q()
+                for job_type in types_list:
+                    type_filter |= Q(type__icontains=job_type.strip())
+                filters &= type_filter
+
+            # 获取岗位数据
+            jobs = Joblist.objects.filter(filters).order_by('-time')
+            # 分页
+            from django.core.paginator import Paginator
+            paginator = Paginator(jobs, page_size)
+
+            if current_page < 1:
+                current_page = 1
+            elif current_page > paginator.num_pages:
+                current_page = paginator.num_pages
+
+            current_page_obj = paginator.page(current_page)
+
+            # 序列化岗位数据
+            job_list = []
+            for job in current_page_obj.object_list:
+                # 格式化薪资
+                if job.salaryMin is not None:
+                    def format_salary(sal):
+                        if sal is None:
+                            return 0
+                        formatted = float(sal)
+                        if formatted == int(formatted):
+                            return str(int(formatted))
+                        else:
+                            return f"{formatted:.1f}"
+                    
+                    min_sal = format_salary(job.salaryMin)
+                    max_sal = format_salary(job.salaryMax)
+                    salary = f"{min_sal}-{max_sal}k"
+                    if job.salaryBonus:
+                        salary += f'*{format_salary(job.salaryBonus)}薪'
+                else:
+                    salary = "薪资面议"
+                
+                # 获取公司名称
+                company_name = job.company.name if job.company else ''
+                company_size = job.company.size if job.company else ''
+                company_location = job.company.location if job.company else ''
+                
+                # 获取负责人信息
+                staff_name = job.staff.realName if job.staff else ''
+                
+                # 格式化行业名称
+                industry_name = ''
+                if job.industry:
+                    try:
+                        from ..models import Industry
+                        industry_obj = Industry.objects.get(code=job.industry)
+                        industry_name = industry_obj.name
+                    except Industry.DoesNotExist:
+                        industry_name = job.industry
+                
+                job_list.append({
+                    'id': job.id,
+                    'title': job.name,
+                    'company': company_name,
+                    'companyId': job.company.id if job.company else None,
+                    'companySize': company_size,
+                    'companyLocation': company_location,
+                    'city': job.city,
+                    'salary': salary,
+                    'salaryMin': float(job.salaryMin) if job.salaryMin else 0,
+                    'salaryMax': float(job.salaryMax) if job.salaryMax else 0,
+                    'salaryBonus': job.salaryBonus,
+                    'education': job.edu,
+                    'experience': job.exp,
+                    'industry': industry_name,
+                    'industryCode': job.industry,
+                    'jobType': job.type,
+                    'headcount': job.num,
+                    'tags': job.tags.split(',') if job.tags else [],
+                    'description': job.content,
+                    'keyList': job.keyList,
+                    'urgency': job.urgency,
+                    'status': job.status,
+                    'staff': staff_name,
+                    'staffId': job.staff.id if job.staff else None,
+                    'publishTime': job.time.strftime('%Y-%m-%d %H:%M:%S') if job.time else '',
+                    'delete': job.delete,
+                })
+
+            # 构建页码范围
             page_range = []
-            visibleNumber = 10
-            min_page = int(cur_page - visibleNumber / 2)
-            if min_page < 1:
-                min_page = 1
-            max_page = min_page + visibleNumber
+            visible_number = 10
+            min_page = max(1, current_page - visible_number // 2)
+            max_page = min(paginator.num_pages + 1, min_page + visible_number)
             if max_page > paginator.num_pages:
-                max_page = paginator.num_pages + 1
+                min_page = max(1, max_page - visible_number)
 
             for i in range(min_page, max_page):
                 page_range.append(i)
-
-            # 序列化职位数据
-            job_list = []
-            for job in c_page.object_list:
-                if isinstance(job, dict):
-                    job_list.append(job)
-                else:
-                    job_list.append({
-                        'id': job.id,
-                        'title': job.name,
-                        'company': job.company,
-                        'city': job.city,
-                        'salary': f"{job.salaryMin}-{job.salaryMax}k",
-                        'education': job.edu,
-                        'experience': job.exp,
-                        'description': job.content,
-                    })
 
             return JsonResponse({
                 'code': 200,
@@ -90,13 +173,14 @@ class JobViewSet(viewsets.ViewSet):
                         'realName': userInfo.realName,
                         'email': userInfo.email,
                     },
-                    'pageData': pageData,
                     'jobs': job_list,
                     'pagination': {
-                        'current_page': cur_page,
+                        'current': current_page,
+                        'current_page': current_page,
                         'total_pages': paginator.num_pages,
                         'total_items': paginator.count,
-                        'items_per_page': 10,
+                        'items_per_page': page_size,
+                        'size': page_size,
                         'page_range': page_range
                     }
                 }
@@ -111,10 +195,10 @@ class JobViewSet(viewsets.ViewSet):
         except Exception as e:
             import logging
             logger = logging.getLogger(__name__)
-            logger.error(f"获取表格数据失败: {e}")
+            logger.error(f"获取表格数据失败: {e}", exc_info=True)
             return JsonResponse({
                 'code': 500,
-                'msg': '获取数据失败，请稍后重试',
+                'msg': f'获取数据失败: {str(e)}',
                 'data': None
             }, status=500)
 
@@ -154,7 +238,7 @@ class JobViewSet(viewsets.ViewSet):
             cached_bonus = cache.get(bonus_cache_key)
 
             if cached_edu_exp is None:
-                from .utils import getSalaryCharData
+                from ..utils import getSalaryCharData
                 educations, workExp, barData = getSalaryCharData.getEduForEpx()
                 lineData = workExp + ["最低薪资", "平均薪资", "最高薪资"]
                 lineDa = educations + ["最低薪资", "平均薪资", "最高薪资"]
@@ -176,7 +260,7 @@ class JobViewSet(viewsets.ViewSet):
                 cached_data = cached_edu_exp
 
             if cached_bonus is None:
-                from .utils import getSalaryCharData
+                from ..utils import getSalaryCharData
                 BonusData = getSalaryCharData.getBonusData()
                 cache.set(bonus_cache_key, BonusData, 1800)
                 cached_bonus_data = BonusData
@@ -235,7 +319,7 @@ class JobViewSet(viewsets.ViewSet):
             cached_people = cache.get(people_cache_key)
 
             if cached_pie is None:
-                from .utils import getCompanyCharData
+                from ..utils import getCompanyCharData
                 pieData = getCompanyCharData.getCompanyPie()
                 cache.set(pie_cache_key, pieData, 1800)
                 cached_pie_data = pieData
@@ -243,7 +327,7 @@ class JobViewSet(viewsets.ViewSet):
                 cached_pie_data = cached_pie
 
             if cached_people is None:
-                from .utils import getCompanyCharData
+                from ..utils import getCompanyCharData
                 companySizes, lineData = getCompanyCharData.getCompanyPeople()
                 cache.set(people_cache_key, {
                     'companySizes': companySizes,
@@ -319,8 +403,8 @@ class JobViewSet(viewsets.ViewSet):
                 }, status=404)
             # 查询条件：公司匹配 且 staff（创建者）是当前招聘者
             jobs = Joblist.objects.filter(
-                company=company_id,
-                staff=employer_id,
+                company_id=company_id,
+                staff_id=employer_id,
                 delete=0
             ).order_by('-id')
             current_page_num = int(request.GET.get('current', request.GET.get('page', 1)))
@@ -343,6 +427,10 @@ class JobViewSet(viewsets.ViewSet):
                         industry_name = industry_obj.name
                     except Industry.DoesNotExist:
                         industry_name = job.industry
+
+                company_name = job.company.name if job.company else ''
+                staff_name = job.staff.realName if job.staff else ''
+
                 job_data = {
                     'id': job.id,
                     'name': job.name,
@@ -361,6 +449,8 @@ class JobViewSet(viewsets.ViewSet):
                     'time': job.time.strftime('%Y-%m-%d %H:%M:%S'),
                     'urgency': job.urgency,
                     'status': job.status,
+                    'company': company_name,
+                    'staff': staff_name,
                 }
 
                 job_list.append(job_data)
@@ -444,8 +534,8 @@ class JobViewSet(viewsets.ViewSet):
                 content=request.data.get('description', ''),
                 urgency=request.data.get('urgency', ''),
                 status=request.data.get('status', ''),
-                company=employer.company,
-                staff=employer.id
+                company_id=employer.company,
+                staff_id=employer.id
             )
 
             return JsonResponse({
@@ -454,7 +544,7 @@ class JobViewSet(viewsets.ViewSet):
                 'data': {
                     'id': job.id,
                     'name': job.name,
-                    'company': employer.comName,
+                    'company': job.company.name if job.company else employer.comName,
                     'createTime': job.time.strftime('%Y-%m-%d %H:%M:%S')
                 }
             }, status=200)
@@ -588,7 +678,7 @@ class JobViewSet(viewsets.ViewSet):
             employer = Employer.objects.get(username=username)
             id = request.data.get('id')
             job = Joblist.objects.get(id=id)
-            if job.company != employer.company:
+            if job.company_id != employer.company:
                 return JsonResponse({
                     'code': 403,
                     'msg': '无权查看此岗位',
@@ -612,8 +702,10 @@ class JobViewSet(viewsets.ViewSet):
                 'urgency': job.urgency,
                 'status': job.status,
                 'time': job.time.strftime('%Y-%m-%d %H:%M:%S'),
-                'companyId': job.company,
-                'staffId': job.staff,
+                'companyId': job.company.id if job.company else None,
+                'companyName': job.company.name if job.company else '',
+                'staffId': job.staff.id if job.staff else None,
+                'staffName': job.staff.realName if job.staff else '',
             }
 
             return JsonResponse({
@@ -668,7 +760,7 @@ class JobViewSet(viewsets.ViewSet):
             id = request.data.get('id')
             job = Joblist.objects.get(id=id)
             # 验证权限：只能操作自己公司的岗位
-            if job.company != employer.company:
+            if job.company_id != employer.company:
                 return JsonResponse({
                     'code': 403,
                     'msg': '无权操作此岗位',
@@ -739,7 +831,7 @@ class JobViewSet(viewsets.ViewSet):
             id = request.data.get('id')
             job = Joblist.objects.get(id=id)
 
-            if job.company != employer.company:
+            if job.company_id != employer.company:
                 return JsonResponse({
                     'code': 403,
                     'msg': '无权操作此岗位',
@@ -808,7 +900,7 @@ class JobViewSet(viewsets.ViewSet):
             employer = Employer.objects.get(username=username)
             id = request.data.get('id')
             job = Joblist.objects.get(id=id)
-            if job.company != employer.company:
+            if job.company_id != employer.company:
                 return JsonResponse({
                     'code': 403,
                     'msg': '无权删除此岗位',

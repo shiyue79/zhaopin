@@ -55,8 +55,8 @@ class Joblist(models.Model):
     tags = models.CharField('福利待遇', max_length=255, default='', db_column='tagList')
     type = models.CharField('职位类型', max_length=255, default='')
     content = models.TextField('职位描述', default='')
-    company = models.IntegerField('公司', default='')
-    staff = models.IntegerField('经理', default='')
+    company = models.ForeignKey('Company', on_delete=models.CASCADE, related_name='joblist', verbose_name='所属公司')
+    staff = models.ForeignKey('Employer', on_delete=models.SET_NULL, null=True, blank=True, related_name='joblist', verbose_name='经理')
     time = models.DateTimeField('发布时间', auto_now_add=True)
     keyList = models.TextField('关键词', default='')
     urgency = models.CharField('紧急程度', max_length=255, default='')
@@ -221,3 +221,40 @@ class Application(models.Model):
 
     class Meta:
         db_table = 'application'
+
+
+class Message(models.Model):
+    id = models.AutoField(primary_key=True)
+    uuid = models.CharField('标识符', max_length=255, null=True, blank=True)
+    user = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, 
+                             related_name='messages', verbose_name='求职者')
+    employer = models.ForeignKey(Employer, on_delete=models.SET_NULL, null=True, blank=True, 
+                                 related_name='messages', verbose_name='招聘者')
+    senderType = models.IntegerField('发送方', default=1)  # 1: user, 2: employer
+    content = models.TextField('消息内容', default='')
+    type = models.CharField('消息类型', max_length=255, default='text')
+    fileUrl = models.CharField('url', max_length=255, default='')
+    createTime = models.DateTimeField('发送时间', auto_now_add=True)
+    isRead = models.IntegerField('是否已读', default=0)
+
+    class Meta:
+        db_table = 'message'
+        ordering = ['-createTime']
+
+    def get_sender(self):
+        if self.senderType == 1:
+            return self.user
+        else:
+            return self.employer
+
+    def get_receiver(self):
+        if self.senderType == 1:
+            return self.employer
+        else:
+            return self.user
+
+    def get_sender_type_str(self):
+        return 'user' if self.senderType == 1 else 'admin'
+
+    def get_receiver_type_str(self):
+        return 'admin' if self.senderType == 2 else 'user'

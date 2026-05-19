@@ -1,6 +1,6 @@
 # myapp/serializers.py
 from rest_framework import serializers
-from .models import User, Joblist, Company, Industry, Application, InterviewStage
+from .models import User, Joblist, Company, Industry, Application, InterviewStage, Message
 
 
 class UserSerializer(serializers.ModelSerializer):
@@ -209,9 +209,64 @@ class IndustrySerializer(serializers.ModelSerializer):
 
 
 class MatchAnalysisSerializer(serializers.Serializer):
-    """匹配分析序列化器"""
     candidate_id = serializers.IntegerField()
     match_score = serializers.FloatField()
     strengths = serializers.ListField(child=serializers.CharField())
     weaknesses = serializers.ListField(child=serializers.CharField())
     suggestions = serializers.ListField(child=serializers.CharField())
+
+class MessageSerializer(serializers.ModelSerializer):
+    # 字段映射
+    sender = serializers.SerializerMethodField()
+    sender_type = serializers.SerializerMethodField()
+    receiver = serializers.SerializerMethodField()
+    receiver_type = serializers.SerializerMethodField()
+    file_url = serializers.CharField(source='fileUrl')
+    create_time = serializers.DateTimeField(source='createTime')
+    is_read = serializers.IntegerField(source='isRead')
+    
+    # 补充发送者和接收者的详细信息
+    sender_info = serializers.SerializerMethodField()
+    receiver_info = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = Message
+        fields = ['id', 'uuid', 'sender', 'sender_type', 'receiver', 'receiver_type', 
+                  'content', 'type', 'file_url', 'create_time', 'is_read', 'sender_info', 'receiver_info']
+        read_only_fields = fields
+
+    def get_sender(self, obj):
+        sender = obj.get_sender()
+        return sender.id if sender else None
+
+    def get_sender_type(self, obj):
+        return obj.get_sender_type_str()
+
+    def get_receiver(self, obj):
+        receiver = obj.get_receiver()
+        return receiver.id if receiver else None
+
+    def get_receiver_type(self, obj):
+        return obj.get_receiver_type_str()
+
+    def get_sender_info(self, obj):
+        sender = obj.get_sender()
+        if not sender:
+            return None
+        return {
+            'id': sender.id,
+            'username': sender.username,
+            'avatar': sender.avatar.url if sender.avatar else None,
+            'online': getattr(sender, 'isOnline', False)
+        }
+
+    def get_receiver_info(self, obj):
+        receiver = obj.get_receiver()
+        if not receiver:
+            return None
+        return {
+            'id': receiver.id,
+            'username': receiver.username,
+            'avatar': receiver.avatar.url if receiver.avatar else None,
+            'online': getattr(receiver, 'isOnline', False)
+        }
