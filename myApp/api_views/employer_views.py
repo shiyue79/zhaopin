@@ -104,7 +104,6 @@ class EmployerViewSet(viewsets.ModelViewSet):
     def submitCertification(self, request):
         username = request.session.get('username')
         account = request.session.get('account')
-
         if not username or not account:
             return JsonResponse({
                 'code': 401,

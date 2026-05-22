@@ -1,6 +1,6 @@
 # myapp/serializers.py
 from rest_framework import serializers
-from .models import User, Joblist, Company, Industry, Application, InterviewStage, Message
+from .models import User, Joblist, Company, Industry, Application, InterviewStage, Message, Employer
 
 
 class UserSerializer(serializers.ModelSerializer):
@@ -66,6 +66,16 @@ class ApplicationListSerializer(serializers.ModelSerializer):
     interview_stages = serializers.SerializerMethodField()
     current_stage_index = serializers.SerializerMethodField()
     resume_url = serializers.SerializerMethodField()
+    manager_name = serializers.SerializerMethodField()
+    manager_position = serializers.SerializerMethodField()
+    staffId = serializers.SerializerMethodField()
+    company_name = serializers.SerializerMethodField()
+    company_size = serializers.SerializerMethodField()
+    company_location = serializers.SerializerMethodField()
+    salary = serializers.SerializerMethodField()
+    salary_min = serializers.SerializerMethodField()
+    salary_max = serializers.SerializerMethodField()
+    job_location = serializers.SerializerMethodField()
 
     class Meta:
         model = Application
@@ -73,13 +83,15 @@ class ApplicationListSerializer(serializers.ModelSerializer):
             'id', 'applicant_name', 'applicant_phone', 'applicant_email',
             'position_name', 'experience', 'education', 'city',
             'status', 'applyTime', 'tags_list', 'interview_stages',
-            'current_stage_index', 'resume_url', 'feedback'
+            'current_stage_index', 'resume_url', 'feedback',
+            'manager_name', 'manager_position', 'staffId',
+            'company_name', 'company_size', 'company_location',
+            'salary', 'salary_min', 'salary_max', 'job_location'
         ]
         read_only_fields = fields
 
     def get_applicant_name(self, obj):
         try:
-            # 优先返回真实姓名，如果没有则返回用户名
             if obj.user.realName:
                 return obj.user.realName
             return obj.user.username
@@ -146,6 +158,86 @@ class ApplicationListSerializer(serializers.ModelSerializer):
                 return obj.user.resume.url
             return None
         except AttributeError:
+            return None
+
+    def get_manager_name(self, obj):
+        try:
+            employer = obj.employer
+            if employer.realName:
+                return employer.realName
+            return employer.username
+        except (AttributeError, Employer.DoesNotExist):
+            return '未知'
+
+    def get_manager_position(self, obj):
+        try:
+            return obj.employer.position or None
+        except AttributeError:
+            return None
+
+    def get_staffId(self, obj):
+        try:
+            return obj.job.staff.id if obj.job.staff else None
+        except (AttributeError, Joblist.DoesNotExist):
+            return None
+
+    def get_company_name(self, obj):
+        try:
+            return obj.job.company.name if obj.job.company else '未知公司'
+        except (AttributeError, Joblist.DoesNotExist):
+            return '未知公司'
+
+    def get_company_size(self, obj):
+        try:
+            return obj.job.company.size if obj.job.company else None
+        except (AttributeError, Joblist.DoesNotExist):
+            return None
+
+    def get_company_location(self, obj):
+        try:
+            return obj.job.company.location if obj.job.company else None
+        except (AttributeError, Joblist.DoesNotExist):
+            return None
+
+    def get_salary(self, obj):
+        try:
+            job = obj.job
+            if job.salaryMin is not None:
+                def format_salary(sal):
+                    if sal is None:
+                        return 0
+                    formatted = float(sal)
+                    if formatted == int(formatted):
+                        return str(int(formatted))
+                    else:
+                        return f"{formatted:.1f}"
+                
+                min_sal = format_salary(job.salaryMin)
+                max_sal = format_salary(job.salaryMax)
+                salary = f"{min_sal}-{max_sal}k"
+                if job.salaryBonus:
+                    salary += f'*{format_salary(job.salaryBonus)}薪'
+                return salary
+            return "薪资面议"
+        except (AttributeError, Joblist.DoesNotExist):
+            return "薪资面议"
+
+    def get_salary_min(self, obj):
+        try:
+            return float(obj.job.salaryMin) if obj.job.salaryMin else 0
+        except (AttributeError, Joblist.DoesNotExist):
+            return 0
+
+    def get_salary_max(self, obj):
+        try:
+            return float(obj.job.salaryMax) if obj.job.salaryMax else 0
+        except (AttributeError, Joblist.DoesNotExist):
+            return 0
+
+    def get_job_location(self, obj):
+        try:
+            return obj.job.city or None
+        except (AttributeError, Joblist.DoesNotExist):
             return None
 
 

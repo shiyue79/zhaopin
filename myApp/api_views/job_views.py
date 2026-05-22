@@ -5,7 +5,7 @@ from rest_framework.decorators import action
 from django.http import JsonResponse
 from django.core.cache import cache
 from django.core.paginator import Paginator
-from ..models import User, Joblist, Employer, Industry
+from ..models import User, Joblist, Employer, Industry, History,Favorite
 from ..serializers import JobSerializer
 import hashlib
 from ..utils import getTableData, getCompanyInfo
@@ -50,7 +50,11 @@ class JobViewSet(viewsets.ViewSet):
             if city:
                 filters &= Q(city__icontains=city)
             if industry:
-                filters &= Q(industry=industry)
+                if industry.endswith('_child'):
+                    parent_code = industry.replace('_child', '')
+                    filters &= Q(industry__startswith=parent_code)
+                else:
+                    filters &= Q(industry__icontains=industry)
             if education and education != '不限':
                 filters &= Q(edu=education)
             if experience and experience != '不限':
@@ -84,6 +88,7 @@ class JobViewSet(viewsets.ViewSet):
             current_page_obj = paginator.page(current_page)
 
             # 序列化岗位数据
+            # 序列化岗位数据
             job_list = []
             for job in current_page_obj.object_list:
                 # 格式化薪资
@@ -96,7 +101,7 @@ class JobViewSet(viewsets.ViewSet):
                             return str(int(formatted))
                         else:
                             return f"{formatted:.1f}"
-                    
+
                     min_sal = format_salary(job.salaryMin)
                     max_sal = format_salary(job.salaryMax)
                     salary = f"{min_sal}-{max_sal}k"
@@ -104,25 +109,34 @@ class JobViewSet(viewsets.ViewSet):
                         salary += f'*{format_salary(job.salaryBonus)}薪'
                 else:
                     salary = "薪资面议"
-                
+
                 # 获取公司名称
                 company_name = job.company.name if job.company else ''
                 company_size = job.company.size if job.company else ''
                 company_location = job.company.location if job.company else ''
-                
+
                 # 获取负责人信息
                 staff_name = job.staff.realName if job.staff else ''
-                
+
                 # 格式化行业名称
                 industry_name = ''
                 if job.industry:
                     try:
                         from ..models import Industry
-                        industry_obj = Industry.objects.get(code=job.industry)
-                        industry_name = industry_obj.name
+                        code_list = job.industry.split('$')
+                        name_list = []
+                        for code in code_list:
+                            code = code.strip()
+                            if code:
+                                industry_obj = Industry.objects.get(code=code)
+                                name_list.append(industry_obj.name)
+                        industry_name = ' > '.join(name_list) if name_list else job.industry
                     except Industry.DoesNotExist:
                         industry_name = job.industry
-                
+
+                # 检查是否已收藏
+                is_favorited = Favorite.objects.filter(job=job, user=userInfo).exists()
+
                 job_list.append({
                     'id': job.id,
                     'title': job.name,
@@ -150,6 +164,7 @@ class JobViewSet(viewsets.ViewSet):
                     'staffId': job.staff.id if job.staff else None,
                     'publishTime': job.time.strftime('%Y-%m-%d %H:%M:%S') if job.time else '',
                     'delete': job.delete,
+                    'isFavorited': is_favorited,
                 })
 
             # 构建页码范围
@@ -199,6 +214,142 @@ class JobViewSet(viewsets.ViewSet):
             return JsonResponse({
                 'code': 500,
                 'msg': f'获取数据失败: {str(e)}',
+                'data': None
+            }, status=500)
+
+    @action(detail=False, methods=['post'], url_path='jobDetail')
+    def getJobDetailForTalent(self, request):
+        try:
+            id = request.data.get('id')
+            if not id:
+                return JsonResponse({
+                    'code': 400,
+                    'msg': '缺少职位ID',
+                    'data': None
+                }, status=400)
+            
+            username = request.session.get('username')
+            if not username:
+                return JsonResponse({
+                    'code': 401,
+                    'msg': '未登录',
+                    'data': None
+                }, status=401)
+            
+            try:
+                user = User.objects.get(username=username)
+            except User.DoesNotExist:
+                return JsonResponse({
+                    'code': 404,
+                    'msg': '用户不存在',
+                    'data': None
+                }, status=404)
+            
+            job = Joblist.objects.get(id=id, delete=0)
+            
+            # 记录浏览历史
+            try:
+                history = History.objects.get(job=job, user=user)
+                history.count += 1
+                history.save()
+            except History.DoesNotExist:
+                History.objects.create(
+                    job=job,
+                    user=user,
+                    count=1
+                )
+            
+            def format_salary(sal):
+                if sal is None:
+                    return 0
+                formatted = float(sal)
+                if formatted == int(formatted):
+                    return str(int(formatted))
+                else:
+                    return f"{formatted:.1f}"
+
+            if job.salaryMin is not None:
+                min_sal = format_salary(job.salaryMin)
+                max_sal = format_salary(job.salaryMax)
+                salary = f"{min_sal}-{max_sal}k"
+                if job.salaryBonus:
+                    salary += f'*{format_salary(job.salaryBonus)}薪'
+            else:
+                salary = "薪资面议"
+            company_name = job.company.name if job.company else ''
+            company_size = job.company.size if job.company else ''
+            company_location = job.company.location if job.company else ''
+            company_content = job.company.content if job.company else ''
+            staff_name = job.staff.realName if job.staff else ''
+
+            industry_name = ''
+            if job.industry:
+                try:
+                    from ..models import Industry
+                    code_list = job.industry.split('$')
+                    name_list = []
+                    for code in code_list:
+                        code = code.strip()
+                        if code:
+                            industry_obj = Industry.objects.get(code=code)
+                            name_list.append(industry_obj.name)
+                    industry_name = ' > '.join(name_list) if name_list else job.industry
+                except Industry.DoesNotExist:
+                    industry_name = job.industry
+
+            # 检查是否已收藏
+            is_favorited = Favorite.objects.filter(job=job, user=user).exists()
+
+            job_data = {
+                'id': job.id,
+                'title': job.name,
+                'company': company_name,
+                'companyId': job.company.id if job.company else None,
+                'companySize': company_size,
+                'companyLocation': company_location,
+                'companyDescription': company_content,
+                'city': job.city,
+                'industry': industry_name,
+                'industryCode': job.industry,
+                'education': job.edu,
+                'experience': job.exp,
+                'salaryMin': float(job.salaryMin) if job.salaryMin else 0,
+                'salaryMax': float(job.salaryMax) if job.salaryMax else 0,
+                'salaryBonus': job.salaryBonus,
+                'salary': salary,
+                'jobType': job.type,
+                'headcount': job.num,
+                'description': job.content,
+                'tags': job.tags.split(',') if job.tags else [],
+                'staff': staff_name,
+                'staffId': job.staff.id if job.staff else None,
+                'recruiterAvatar': job.staff.avatar.url if job.staff and job.staff.avatar else '',
+                'status': job.status,
+                'urgency': job.urgency,
+                'publishTime': job.time.strftime('%Y-%m-%d %H:%M:%S') if job.time else '',
+                'delete': job.delete,
+                'isFavorited': is_favorited,
+            }
+
+            return JsonResponse({
+                'code': 200,
+                'msg': '获取职位详情成功',
+                'data': job_data
+            }, status=200)
+
+        except Joblist.DoesNotExist:
+            return JsonResponse({
+                'code': 404,
+                'msg': '职位不存在',
+                'data': None
+            }, status=404)
+        except Exception as e:
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.error(f"获取职位详情失败: {e}")
+            return JsonResponse({
+                'code': 500,
+                'msg': f'获取职位详情失败: {str(e)}',
                 'data': None
             }, status=500)
 
@@ -937,5 +1088,512 @@ class JobViewSet(viewsets.ViewSet):
             return JsonResponse({
                 'code': 500,
                 'msg': f'删除失败: {str(e)}',
+                'data': None
+            }, status=500)
+    @action(detail=False, methods=['post'], url_path='favorite')
+    def favoriteJob(self, request):
+        username = request.session.get('username')
+        if not username:
+            return JsonResponse({
+                'code': 401,
+                'msg': '未登录，请先登录',
+                'data': None
+            }, status=401)
+
+        try:
+            user = User.objects.get(username=username)
+            job_id = request.data.get('id')
+
+            if not job_id:
+                return JsonResponse({
+                    'code': 400,
+                    'msg': '缺少岗位ID',
+                    'data': None
+                }, status=400)
+
+            job = Joblist.objects.get(id=job_id, delete=0)
+
+            # 创建收藏记录（如果已存在则忽略）
+            favorite, created = Favorite.objects.get_or_create(
+                job=job,
+                user=user
+            )
+
+            if created:
+                return JsonResponse({
+                    'code': 200,
+                    'msg': '收藏成功',
+                    'data': {
+                        'id': favorite.id,
+                        'jobId': job.id,
+                        'jobName': job.name
+                    }
+                }, status=200)
+            else:
+                return JsonResponse({
+                    'code': 200,
+                    'msg': '已收藏',
+                    'data': {
+                        'id': favorite.id,
+                        'jobId': job.id,
+                        'jobName': job.name
+                    }
+                }, status=200)
+
+        except Joblist.DoesNotExist:
+            return JsonResponse({
+                'code': 404,
+                'msg': '岗位不存在',
+                'data': None
+            }, status=404)
+        except User.DoesNotExist:
+            return JsonResponse({
+                'code': 404,
+                'msg': '用户不存在',
+                'data': None
+            }, status=404)
+        except Exception as e:
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.error(f"收藏岗位失败: {e}")
+            return JsonResponse({
+                'code': 500,
+                'msg': f'收藏失败: {str(e)}',
+                'data': None
+            }, status=500)
+
+    @action(detail=False, methods=['post'], url_path='unfavorite')
+    def unfavoriteJob(self, request):
+        username = request.session.get('username')
+        if not username:
+            return JsonResponse({
+                'code': 401,
+                'msg': '未登录，请先登录',
+                'data': None
+            }, status=401)
+
+        try:
+            user = User.objects.get(username=username)
+            job_id = request.data.get('id')
+
+            if not job_id:
+                return JsonResponse({
+                    'code': 400,
+                    'msg': '缺少岗位ID',
+                    'data': None
+                }, status=400)
+
+            # 删除收藏记录
+            deleted_count, _ = Favorite.objects.filter(
+                job_id=job_id,
+                user=user
+            ).delete()
+
+            if deleted_count > 0:
+                return JsonResponse({
+                    'code': 200,
+                    'msg': '取消收藏成功',
+                    'data': None
+                }, status=200)
+            else:
+                return JsonResponse({
+                    'code': 200,
+                    'msg': '未收藏该岗位',
+                    'data': None
+                }, status=200)
+
+        except User.DoesNotExist:
+            return JsonResponse({
+                'code': 404,
+                'msg': '用户不存在',
+                'data': None
+            }, status=404)
+        except Exception as e:
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.error(f"取消收藏失败: {e}")
+            return JsonResponse({
+                'code': 500,
+                'msg': f'取消收藏失败: {str(e)}',
+                'data': None
+            }, status=500)
+
+    @action(detail=False, methods=['get'], url_path='favoriteList')
+    def getFavoriteJobs(self, request):
+        username = request.session.get('username')
+        if not username:
+            return JsonResponse({
+                'code': 401,
+                'msg': '未登录，请先登录',
+                'data': None
+            }, status=401)
+
+        try:
+            user = User.objects.get(username=username)
+
+            # 获取筛选参数
+            work = request.GET.get('work', '')
+            city = request.GET.get('city', '')
+            industry = request.GET.get('industry', '')
+            education = request.GET.get('education', '不限')
+            experience = request.GET.get('experience', '不限')
+            salary_min = request.GET.get('salaryMin', '')
+            company_size = request.GET.get('companySize', '')
+            job_types = request.GET.get('jobTypes', '')
+
+            # 分页参数
+            current_page = int(request.GET.get('current', request.GET.get('page', 1)))
+            page_size = int(request.GET.get('size', request.GET.get('pageSize', 10)))
+
+            # 获取用户的收藏记录
+            favorites = Favorite.objects.filter(user=user).order_by('-id')
+
+            # 获取收藏的岗位ID列表
+            job_ids = [fav.job_id for fav in favorites]
+
+            # 构建查询条件
+            from django.db.models import Q
+            filters = Q(id__in=job_ids) & Q(delete=0)
+
+            if work:
+                filters &= Q(name__icontains=work) | Q(keyList__icontains=work)
+            if city:
+                filters &= Q(city__icontains=city)
+            if industry:
+                if industry.endswith('_child'):
+                    parent_code = industry.replace('_child', '')
+                    filters &= Q(industry__startswith=parent_code)
+                else:
+                    filters &= Q(industry__icontains=industry)
+            if education and education != '不限':
+                filters &= Q(edu=education)
+            if experience and experience != '不限':
+                filters &= Q(exp=experience)
+            if salary_min:
+                try:
+                    filters &= Q(salaryMin__gte=float(salary_min))
+                except ValueError:
+                    pass
+            if company_size:
+                filters &= Q(comSize=company_size)
+            if job_types:
+                types_list = job_types.split(',')
+                type_filter = Q()
+                for job_type in types_list:
+                    type_filter |= Q(type__icontains=job_type.strip())
+                filters &= type_filter
+
+            # 获取岗位数据
+            jobs = Joblist.objects.filter(filters).order_by('-time')
+            paginator = Paginator(jobs, page_size)
+
+            if current_page < 1:
+                current_page = 1
+            elif current_page > paginator.num_pages:
+                current_page = paginator.num_pages
+
+            current_page_obj = paginator.page(current_page)
+
+            # 序列化岗位数据（与joblist方法相同的格式）
+            job_list = []
+            for job in current_page_obj.object_list:
+                if job.salaryMin is not None:
+                    def format_salary(sal):
+                        if sal is None:
+                            return 0
+                        formatted = float(sal)
+                        if formatted == int(formatted):
+                            return str(int(formatted))
+                        else:
+                            return f"{formatted:.1f}"
+
+                    min_sal = format_salary(job.salaryMin)
+                    max_sal = format_salary(job.salaryMax)
+                    salary = f"{min_sal}-{max_sal}k"
+                    if job.salaryBonus:
+                        salary += f'*{format_salary(job.salaryBonus)}薪'
+                else:
+                    salary = "薪资面议"
+
+                company_name = job.company.name if job.company else ''
+                company_size = job.company.size if job.company else ''
+                company_location = job.company.location if job.company else ''
+                staff_name = job.staff.realName if job.staff else ''
+
+                industry_name = ''
+                if job.industry:
+                    try:
+                        code_list = job.industry.split('$')
+                        name_list = []
+                        for code in code_list:
+                            code = code.strip()
+                            if code:
+                                industry_obj = Industry.objects.get(code=code)
+                                name_list.append(industry_obj.name)
+                        industry_name = ' > '.join(name_list) if name_list else job.industry
+                    except Industry.DoesNotExist:
+                        industry_name = job.industry
+
+                # 收藏列表中的岗位都是已收藏状态
+                job_list.append({
+                    'id': job.id,
+                    'title': job.name,
+                    'company': company_name,
+                    'companyId': job.company.id if job.company else None,
+                    'companySize': company_size,
+                    'companyLocation': company_location,
+                    'city': job.city,
+                    'salary': salary,
+                    'salaryMin': float(job.salaryMin) if job.salaryMin else 0,
+                    'salaryMax': float(job.salaryMax) if job.salaryMax else 0,
+                    'salaryBonus': job.salaryBonus,
+                    'education': job.edu,
+                    'experience': job.exp,
+                    'industry': industry_name,
+                    'industryCode': job.industry,
+                    'jobType': job.type,
+                    'headcount': job.num,
+                    'tags': job.tags.split(',') if job.tags else [],
+                    'description': job.content,
+                    'keyList': job.keyList,
+                    'urgency': job.urgency,
+                    'status': job.status,
+                    'staff': staff_name,
+                    'staffId': job.staff.id if job.staff else None,
+                    'publishTime': job.time.strftime('%Y-%m-%d %H:%M:%S') if job.time else '',
+                    'delete': job.delete,
+                    'isFavorited': True,
+                })
+
+            # 构建页码范围
+            page_range = []
+            visible_number = 10
+            min_page = max(1, current_page - visible_number // 2)
+            max_page = min(paginator.num_pages + 1, min_page + visible_number)
+            if max_page > paginator.num_pages:
+                min_page = max(1, max_page - visible_number)
+
+            for i in range(min_page, max_page):
+                page_range.append(i)
+
+            return JsonResponse({
+                'code': 200,
+                'msg': '获取收藏列表成功',
+                'data': {
+                    'jobs': job_list,
+                    'pagination': {
+                        'current': current_page,
+                        'current_page': current_page,
+                        'total_pages': paginator.num_pages,
+                        'total_items': paginator.count,
+                        'items_per_page': page_size,
+                        'size': page_size,
+                        'page_range': page_range
+                    }
+                }
+            }, status=200)
+
+        except User.DoesNotExist:
+            return JsonResponse({
+                'code': 404,
+                'msg': '用户不存在',
+                'data': None
+            }, status=404)
+        except Exception as e:
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.error(f"获取收藏列表失败: {e}", exc_info=True)
+            return JsonResponse({
+                'code': 500,
+                'msg': f'获取收藏列表失败: {str(e)}',
+                'data': None
+            }, status=500)
+
+    @action(detail=False, methods=['get'], url_path='viewHistory')
+    def getViewHistory(self, request):
+        username = request.session.get('username')
+        if not username:
+            return JsonResponse({
+                'code': 401,
+                'msg': '未登录，请先登录',
+                'data': None
+            }, status=401)
+
+        try:
+            user = User.objects.get(username=username)
+
+            # 获取筛选参数
+            work = request.GET.get('work', '')
+            city = request.GET.get('city', '')
+            industry = request.GET.get('industry', '')
+            education = request.GET.get('education', '不限')
+            experience = request.GET.get('experience', '不限')
+            salary_min = request.GET.get('salaryMin', '')
+            company_size = request.GET.get('companySize', '')
+            job_types = request.GET.get('jobTypes', '')
+
+            # 分页参数
+            current_page = int(request.GET.get('current', request.GET.get('page', 1)))
+            page_size = int(request.GET.get('size', request.GET.get('pageSize', 10)))
+
+            # 获取用户的浏览历史记录
+            histories = History.objects.filter(user=user).order_by('-id')
+
+            # 获取浏览的岗位ID列表
+            job_ids = [hist.job_id for hist in histories]
+
+            # 构建查询条件
+            from django.db.models import Q
+            filters = Q(id__in=job_ids) & Q(delete=0)
+
+            if work:
+                filters &= Q(name__icontains=work) | Q(keyList__icontains=work)
+            if city:
+                filters &= Q(city__icontains=city)
+            if industry:
+                if industry.endswith('_child'):
+                    parent_code = industry.replace('_child', '')
+                    filters &= Q(industry__startswith=parent_code)
+                else:
+                    filters &= Q(industry__icontains=industry)
+            if education and education != '不限':
+                filters &= Q(edu=education)
+            if experience and experience != '不限':
+                filters &= Q(exp=experience)
+            if salary_min:
+                try:
+                    filters &= Q(salaryMin__gte=float(salary_min))
+                except ValueError:
+                    pass
+            if company_size:
+                filters &= Q(comSize=company_size)
+            if job_types:
+                types_list = job_types.split(',')
+                type_filter = Q()
+                for job_type in types_list:
+                    type_filter |= Q(type__icontains=job_type.strip())
+                filters &= type_filter
+
+            # 获取岗位数据
+            jobs = Joblist.objects.filter(filters).order_by('-time')
+            paginator = Paginator(jobs, page_size)
+
+            if current_page < 1:
+                current_page = 1
+            elif current_page > paginator.num_pages:
+                current_page = paginator.num_pages
+
+            current_page_obj = paginator.page(current_page)
+
+            # 序列化岗位数据（与joblist方法相同的格式）
+            job_list = []
+            for job in current_page_obj.object_list:
+                if job.salaryMin is not None:
+                    def format_salary(sal):
+                        if sal is None:
+                            return 0
+                        formatted = float(sal)
+                        if formatted == int(formatted):
+                            return str(int(formatted))
+                        else:
+                            return f"{formatted:.1f}"
+
+                    min_sal = format_salary(job.salaryMin)
+                    max_sal = format_salary(job.salaryMax)
+                    salary = f"{min_sal}-{max_sal}k"
+                    if job.salaryBonus:
+                        salary += f'*{format_salary(job.salaryBonus)}薪'
+                else:
+                    salary = "薪资面议"
+
+                company_name = job.company.name if job.company else ''
+                company_size = job.company.size if job.company else ''
+                company_location = job.company.location if job.company else ''
+                staff_name = job.staff.realName if job.staff else ''
+
+                industry_name = ''
+                if job.industry:
+                    try:
+                        code_list = job.industry.split('$')
+                        name_list = []
+                        for code in code_list:
+                            code = code.strip()
+                            if code:
+                                industry_obj = Industry.objects.get(code=code)
+                                name_list.append(industry_obj.name)
+                        industry_name = ' > '.join(name_list) if name_list else job.industry
+                    except Industry.DoesNotExist:
+                        industry_name = job.industry
+
+                job_list.append({
+                    'id': job.id,
+                    'title': job.name,
+                    'company': company_name,
+                    'companyId': job.company.id if job.company else None,
+                    'companySize': company_size,
+                    'companyLocation': company_location,
+                    'city': job.city,
+                    'salary': salary,
+                    'salaryMin': float(job.salaryMin) if job.salaryMin else 0,
+                    'salaryMax': float(job.salaryMax) if job.salaryMax else 0,
+                    'salaryBonus': job.salaryBonus,
+                    'education': job.edu,
+                    'experience': job.exp,
+                    'industry': industry_name,
+                    'industryCode': job.industry,
+                    'jobType': job.type,
+                    'headcount': job.num,
+                    'tags': job.tags.split(',') if job.tags else [],
+                    'description': job.content,
+                    'keyList': job.keyList,
+                    'urgency': job.urgency,
+                    'status': job.status,
+                    'staff': staff_name,
+                    'staffId': job.staff.id if job.staff else None,
+                    'publishTime': job.time.strftime('%Y-%m-%d %H:%M:%S') if job.time else '',
+                    'delete': job.delete,
+                })
+
+            # 构建页码范围
+            page_range = []
+            visible_number = 10
+            min_page = max(1, current_page - visible_number // 2)
+            max_page = min(paginator.num_pages + 1, min_page + visible_number)
+            if max_page > paginator.num_pages:
+                min_page = max(1, max_page - visible_number)
+
+            for i in range(min_page, max_page):
+                page_range.append(i)
+
+            return JsonResponse({
+                'code': 200,
+                'msg': '获取浏览历史成功',
+                'data': {
+                    'jobs': job_list,
+                    'pagination': {
+                        'current': current_page,
+                        'current_page': current_page,
+                        'total_pages': paginator.num_pages,
+                        'total_items': paginator.count,
+                        'items_per_page': page_size,
+                        'size': page_size,
+                        'page_range': page_range
+                    }
+                }
+            }, status=200)
+
+        except User.DoesNotExist:
+            return JsonResponse({
+                'code': 404,
+                'msg': '用户不存在',
+                'data': None
+            }, status=404)
+        except Exception as e:
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.error(f"获取浏览历史失败: {e}", exc_info=True)
+            return JsonResponse({
+                'code': 500,
+                'msg': f'获取浏览历史失败: {str(e)}',
                 'data': None
             }, status=500)

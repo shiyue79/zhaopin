@@ -33,7 +33,7 @@ class TalentViewSet(viewsets.ViewSet):
                 queryset = queryset.filter(edu=education)
             if experience:
                 queryset = queryset.filter(exp=experience)
-            queryset = queryset.order_by('-createTime')
+            queryset = queryset.order_by('-lastLoginTime', '-createTime')
             paginator = Paginator(queryset, page_size)
             if page < 1:
                 page = 1

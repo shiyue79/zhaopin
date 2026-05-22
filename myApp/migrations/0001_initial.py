@@ -105,7 +105,8 @@ class Migration(migrations.Migration):
                 ('realName', models.CharField(default='', max_length=255, verbose_name='真实姓名')),
                 ('sex', models.CharField(default='', max_length=255, verbose_name='性别')),
                 ('position', models.CharField(default='', max_length=255, verbose_name='职位')),
-                ('company', models.IntegerField(default='', verbose_name='所属公司')),
+                ('company', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='employer',
+                                              to='myApp.company', verbose_name='公司')),
                 ('comName', models.CharField(default='', max_length=255, verbose_name='公司名称')),
                 ('avatar', models.FileField(default='avatar/cat.jpg', upload_to='avatar', verbose_name='用户图像')),
                 ('lastLoginTime', models.DateTimeField(auto_now_add=True, verbose_name='最后登录时间')),
@@ -121,12 +122,22 @@ class Migration(migrations.Migration):
             fields=[
                 ('id', models.AutoField(primary_key=True, serialize=False, verbose_name='id')),
                 ('count', models.IntegerField(default=1, verbose_name='点击次数')),
-                ('duration', models.TimeField(default='00:00:00', verbose_name='时长')),
-                ('job', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, to='myApp.job')),
+                ('job', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, to='myApp.joblist')),
                 ('user', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, to='myApp.user')),
             ],
             options={
                 'db_table': 'history',
+            },
+        ),
+        migrations.CreateModel(
+            name='Favorite',
+            fields=[
+                ('id', models.AutoField(primary_key=True, serialize=False, verbose_name='id')),
+                ('job', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, to='myApp.joblist')),
+                ('user', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, to='myApp.user')),
+            ],
+            options={
+                'db_table': 'favorite',
             },
         ),
         migrations.CreateModel(
@@ -137,7 +148,6 @@ class Migration(migrations.Migration):
                 ('size', models.CharField(default='', max_length=255, verbose_name='公司规模')),
                 ('tag', models.CharField(default='', max_length=255, verbose_name='公司所属行业')),
                 ('location', models.CharField(default='', max_length=255, verbose_name='公司详细地址')),
-                ('city', models.CharField(default='', max_length=255, verbose_name='公司所在城市')),
                 ('logo', models.FileField(default='', upload_to='logo', verbose_name='公司logo')),
                 ('content', models.TextField(default='', verbose_name='公司简介')),
                 ('verification', models.FileField(default='', upload_to='verification', verbose_name='公司认证信息')),

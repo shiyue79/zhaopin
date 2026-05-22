@@ -5,7 +5,7 @@ import os
 def getCompanyInfo(username):
     try:
         employer = Employer.objects.get(username=username)
-        company_id = employer.company
+        company_id = employer.company_id
 
         if not company_id:
             return {
@@ -21,7 +21,6 @@ def getCompanyInfo(username):
             'companyIntro': company.content,
             'logo': company.logo.url if company.logo else '',
             'location': company.location,
-            'city': company.city,
             'size': company.size,
             'tag': company.tag,
             'isCertified': company.vfbool == 1,
@@ -47,7 +46,7 @@ def getCompanyInfo(username):
 def saveCompanyInfo(username, data, files=None):
     try:
         employer = Employer.objects.get(username=username)
-        company_id = employer.company
+        company_id = employer.company_id
 
         if not company_id:
             return {'success': False, 'message': '未关联公司'}
@@ -58,7 +57,6 @@ def saveCompanyInfo(username, data, files=None):
         company.name = data.get('name', company.name)
         company.content = data.get('content', company.content)
         company.location = data.get('location', company.location)
-        company.city = data.get('city', company.city)
         company.size = data.get('size', company.size)
         company.tag = data.get('tag', company.tag)
 
@@ -91,7 +89,7 @@ def submitCertification(username, files):
             return {'success': False, 'message': '请上传营业执照'}
 
         employer = Employer.objects.get(username=username)
-        company_id = employer.company
+        company_id = employer.company_id
 
         if not company_id:
             return {'success': False, 'message': '未关联公司'}

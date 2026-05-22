@@ -99,7 +99,7 @@ class Employer(models.Model):
     realName = models.CharField('真实姓名', max_length=255, default='')
     sex = models.CharField('性别', max_length=255, default='')
     position = models.CharField('职位', max_length=255, default='')
-    company = models.IntegerField('所属公司', default='')
+    company  = models.ForeignKey('Company', on_delete=models.CASCADE, related_name='employer', verbose_name='所属公司')
     comName = models.CharField('公司名称', max_length=255, default='')
     avatar = models.FileField('用户图像', upload_to=avatar_upload_path, default='avatar/cat.jpg')
     lastLoginTime = models.DateTimeField('上次登录时间', null=True, blank=True)
@@ -123,7 +123,6 @@ class Company(models.Model):
     size = models.CharField('公司规模', max_length=255, default='')
     tag = models.CharField('公司所属行业', max_length=255, default='')
     location = models.CharField('公司详细地址', max_length=255, default='')
-    city = models.CharField('公司所在地', max_length=255, default='')
     logo = models.FileField('公司logo', upload_to=avatar_upload_path, default='avatar/cat.jpg')
     content = models.TextField('公司简介', default='')
     verification = models.FileField('公司认证信息', upload_to=certification_upload_path, default='')
@@ -136,14 +135,22 @@ class Company(models.Model):
 
 class History(models.Model):
     id = models.AutoField('id', primary_key=True)
-    job = models.ForeignKey(Job, on_delete=models.CASCADE)
-    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    job = models.ForeignKey(Joblist, on_delete=models.CASCADE, related_name='histories', verbose_name='职位')
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='histories', verbose_name='求职者')
     count = models.IntegerField('点击次数', default=1)
-    duration = models.TimeField('时长', default='00:00:00')
 
     class Meta:
         db_table = 'history'
+        unique_together = ('job', 'user')
 
+class Favorite(models.Model):
+    id = models.AutoField('id', primary_key=True)
+    job = models.ForeignKey(Joblist, on_delete=models.CASCADE, related_name='favorite', verbose_name='职位')
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='favorite', verbose_name='求职者')
+
+    class Meta:
+        db_table = 'favorite'
+        unique_together = ('job', 'user')
 
 class Industry(models.Model):
     code = models.CharField(max_length=20, unique=True, verbose_name="行业代码")
@@ -206,6 +213,7 @@ class Application(models.Model):
         ('finalPass', '面试通过'),
         ('hired', '已录用'),
         ('archived', '已淘汰'),
+        ('rejected', '被求职者拒绝'),
     ]
 
     id = models.AutoField('id', primary_key=True)

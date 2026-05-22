@@ -131,7 +131,7 @@ class UserViewSet(viewsets.ModelViewSet):
                     'realName': user.realName,
                     'sex': user.sex,
                     'position': user.position,
-                    'company': user.company,
+                    'company': user.company.id,
                     'comName': user.comName,
                     'avatar': request.build_absolute_uri(user.avatar.url) if user.avatar else None
                 }
