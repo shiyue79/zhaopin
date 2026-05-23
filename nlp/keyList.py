@@ -19,8 +19,8 @@ class JobDataProcessor:
             pool_pre_ping=True
         )
         query = """
-                SELECT href, tagList, content, company, keyList
-                FROM job
+                SELECT id, tagList, content, keyList
+                FROM joblist
                 """
         jobs_df = pd.read_sql(query, engine)
         engine.dispose()
@@ -92,7 +92,7 @@ engine = create_engine(
             pool_pre_ping=True
         )
 with engine.connect() as conn:
-    batch_size = 0
+    batch_size = 100
     total_rows = len(jobs_df)
 
     for start_idx in range(0, total_rows, batch_size):
@@ -108,11 +108,11 @@ with engine.connect() as conn:
                 if not skill_weights:
                     continue
                 update_query = text("""
-                                    UPDATE job
+                                    UPDATE joblist
                                     SET keyList = :keyList
-                                    WHERE href = :href
+                                    WHERE id = :id
                                     """)
-                result = conn.execute(update_query, {'keyList': skill_weights, 'href': row['href']})
+                result = conn.execute(update_query, {'keyList': skill_weights, 'id': row['id']})
             trans.commit()
             print(f"✅ 批次 {start_idx // batch_size + 1}: 成功更新 (范围: {start_idx}-{end_idx - 1})")
         except Exception as e:

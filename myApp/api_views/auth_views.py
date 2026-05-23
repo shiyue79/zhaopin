@@ -1,27 +1,194 @@
-# myApp/api_views/auth_views.py
 from django.utils import timezone
 from rest_framework import viewsets, permissions, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from django.contrib.auth import authenticate, login, logout
-from ..models import User, Employer
+from ..models import User, Employer,Company
 from ..serializers import UserSerializer
 import hashlib
 from rest_framework_simplejwt.tokens import RefreshToken
 from django.http import JsonResponse
 from ..utils import getSelfInfo, getChangePwd
+from django.db import models
 
 class UserViewSet(viewsets.ModelViewSet):
     queryset = User.objects.all()
     serializer_class = UserSerializer
 
     @action(detail=False, methods=['post'], permission_classes=[permissions.AllowAny])
-    def register(self, request):
-        serializer = self.get_serializer(data=request.data)
-        if serializer.is_valid():
-            user = serializer.save()
-            return Response({'id': user.id, 'username': user.username}, status=status.HTTP_201_CREATED)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    def register_admin(self, request):
+        username = request.data.get('username')
+        password = request.data.get('password')
+        company_name = request.data.get('companyName')
+        company_id = request.data.get('companyId')
+        if not all([username, password]):
+            return JsonResponse({
+                'code': 400,
+                'msg': '用户名和密码不能为空',
+                'data': None
+            }, status=400)
+        if company_id:
+            try:
+                company = Company.objects.get(id=company_id)
+            except Company.DoesNotExist:
+                return JsonResponse({
+                    'code': 400,
+                    'msg': '公司不存在',
+                    'data': None
+                }, status=400)
+        else:
+            return JsonResponse({
+                'code': 400,
+                'msg': '请提供 companyId 或 companyName',
+                'data': None
+            }, status=400)
+        try:
+            if Employer.objects.filter(username=username).exists():
+                return JsonResponse({
+                    'code': 400,
+                    'msg': '用户名已存在',
+                    'data': None
+                }, status=400)
+            md5 = hashlib.md5()
+            md5.update(password.encode())
+            pwd = md5.hexdigest()
+            employer = Employer.objects.create(
+                username=username,
+                password=pwd,
+                comName=company.name,
+                company=company,
+            )
+            return JsonResponse({
+                'code': 200,
+                'msg': '注册成功',
+                'data': {
+                    'userId': employer.id,
+                    'username': employer.username,
+                    'companyName': employer.comName,
+                    'companyId': company.id,
+                }
+            }, status=201)
+            
+        except Exception as e:
+            return JsonResponse({
+                'code': 500,
+                'msg': '注册失败，请稍后重试',
+                'data': None
+            }, status=500)
+
+    @action(detail=False, methods=['post'], permission_classes=[permissions.AllowAny])
+    def register_user(self, request):
+        username = request.data.get('username')
+        password = request.data.get('password')
+        if not all([username, password]):
+            return JsonResponse({
+                'code': 400,
+                'msg': '用户名和密码不能为空',
+                'data': None
+            }, status=400)
+
+        try:
+            if User.objects.filter(username=username).exists():
+                return JsonResponse({
+                    'code': 400,
+                    'msg': '用户名已存在',
+                    'data': None
+                }, status=400)
+            md5 = hashlib.md5()
+            md5.update(password.encode())
+            pwd = md5.hexdigest()
+            user = User.objects.create(
+                username=username,
+                password=pwd
+            )
+            return JsonResponse({
+                'code': 200,
+                'msg': '注册成功',
+                'data': {
+                    'userId': user.id,
+                    'username': user.username,
+                }
+            }, status=201)
+        except Exception as e:
+            return JsonResponse({
+                'code': 500,
+                'msg': '注册失败，请稍后重试',
+                'data': None
+            }, status=500)
+
+    @action(detail=False, methods=['post'], permission_classes=[permissions.AllowAny])
+    def create_company(self, request):
+        username = request.session.get('username')
+        account = request.session.get('account')
+        name = request.data.get('name')
+        industry = request.data.get('industry', '')
+        scale = request.data.get('scale', '')
+        if not name:
+            return JsonResponse({
+                'code': 400,
+                'msg': '公司名称不能为空',
+                'data': None
+            }, status=400)
+        try:
+            # 检查公司名称是否已存在
+            existing_company = Company.objects.filter(name=name).first()
+            if existing_company :
+                return JsonResponse({
+                    'code': 400,
+                    'msg': '公司名称已被认证，请使用其他名称',
+                    'data': None
+                }, status=400)
+            # 创建公司
+            company = Company.objects.create(
+                name=name,
+                size=scale,
+                tag=industry,
+            )
+            return JsonResponse({
+                'code': 200,
+                'msg': '公司创建成功',
+                'data': {
+                    'id': company.id,
+                    'name': company.name,
+                    'size': company.size,
+                    'tag': company.tag,
+                    'location': company.location
+                }
+            }, status=201)
+        except Exception as e:
+            return JsonResponse({
+                'code': 500,
+                'msg': '创建失败，请稍后重试',
+                'data': None
+            }, status=500)
+
+    @action(detail=False, methods=['get'], permission_classes=[permissions.AllowAny])
+    def search_company(self, request):
+        keyword = request.GET.get('keyword', '').strip()
+        if not keyword:
+            return JsonResponse({
+                'code': 400,
+                'msg': '搜索关键词不能为空',
+                'data': []
+            }, status=400)
+        try:
+            companies = Company.objects.filter(
+                models.Q(name__icontains=keyword)
+            ).values(
+                'id', 'name'
+            )[:50]  # 限制返回结果数量
+            company_list = list(companies)
+            return JsonResponse({
+                'code': 200,
+                'msg': '搜索成功',
+                'data': company_list
+            }, status=200)
+        except Exception as e:
+            return JsonResponse({
+                'code': 500,
+                'msg': '搜索失败',
+                'data': []
+            }, status=500)
 
     @action(detail=False, methods=['post'], permission_classes=[permissions.AllowAny])
     def login(self, request):
@@ -55,7 +222,7 @@ class UserViewSet(viewsets.ModelViewSet):
                     'refreshToken': str(refresh)
                 }
             })
-        except User.DoesNotExist:
+        except (User.DoesNotExist, Employer.DoesNotExist):
             return JsonResponse({
                 'code': 401,
                 'msg': '用户名或密码不正确',

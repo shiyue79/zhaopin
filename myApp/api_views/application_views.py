@@ -175,8 +175,12 @@ class ApplicationViewSet(viewsets.ViewSet):
                 applications = applications.filter(user__in=user_ids)
 
             if position:
-                job_ids = Joblist.objects.filter(name__icontains=position).values_list('id', flat=True)
+                job_ids = Joblist.objects.filter(
+                    models.Q(name__icontains=position) |
+                    models.Q(company__name__icontains=position)
+                ).values_list('id', flat=True)
                 applications = applications.filter(job__in=job_ids)
+                
             if status:
                 applications = applications.filter(status=status)
             if apply_time:
@@ -774,20 +778,27 @@ class ApplicationViewSet(viewsets.ViewSet):
             size = int(request.GET.get('size', 10))
             keyword = request.GET.get('keyword', '')
             status = request.GET.get('status', '')
-            apply_time = request.GET.get('applyTime', '')
+            start_date = request.GET.get('startDate', '')
+            
             # 查询当前求职者的申请记录
             applications = Application.objects.filter(
                 user=user
             ).select_related('job', 'employer').prefetch_related('stages').order_by('-applyTime')
             if keyword:
-                job_ids = Joblist.objects.filter(name__icontains=keyword).values_list('id', flat=True)
-                applications = applications.filter(job__in=job_ids)
+                job_ids = Joblist.objects.filter(
+                    name__icontains=keyword
+                ).values_list('id', flat=True)
+                company_jobs = Joblist.objects.filter(
+                    company__name__icontains=keyword
+                ).values_list('id', flat=True)
+                all_job_ids = set(job_ids) | set(company_jobs)
+                applications = applications.filter(job__in=all_job_ids)
 
             if status:
                 applications = applications.filter(status=status)
 
-            if apply_time:
-                applications = applications.filter(applyTime__date=apply_time)
+            if start_date:
+                applications = applications.filter(applyTime__gte=start_date)
 
             paginator = Paginator(applications, size)
             if page < 1:

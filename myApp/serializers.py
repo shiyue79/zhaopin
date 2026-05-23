@@ -55,6 +55,7 @@ class InterviewStageSerializer(serializers.ModelSerializer):
 
 class ApplicationListSerializer(serializers.ModelSerializer):
     """用于列表展示的简化序列化器"""
+    applicant_id = serializers.SerializerMethodField()
     applicant_name = serializers.SerializerMethodField()
     applicant_phone = serializers.SerializerMethodField()
     applicant_email = serializers.SerializerMethodField()
@@ -80,7 +81,7 @@ class ApplicationListSerializer(serializers.ModelSerializer):
     class Meta:
         model = Application
         fields = [
-            'id', 'applicant_name', 'applicant_phone', 'applicant_email',
+            'id', 'applicant_id', 'applicant_name', 'applicant_phone', 'applicant_email',
             'position_name', 'experience', 'education', 'city',
             'status', 'applyTime', 'tags_list', 'interview_stages',
             'current_stage_index', 'resume_url', 'feedback',
@@ -89,6 +90,12 @@ class ApplicationListSerializer(serializers.ModelSerializer):
             'salary', 'salary_min', 'salary_max', 'job_location'
         ]
         read_only_fields = fields
+
+    def get_applicant_id(self, obj):
+        try:
+            return obj.user.id if obj.user else None
+        except (AttributeError, User.DoesNotExist):
+            return None
 
     def get_applicant_name(self, obj):
         try:
@@ -348,6 +355,7 @@ class MessageSerializer(serializers.ModelSerializer):
         return {
             'id': sender.id,
             'username': sender.username,
+            'realname': sender.realName,
             'avatar': sender.avatar.url if sender.avatar else None,
             'online': getattr(sender, 'isOnline', False)
         }
@@ -359,6 +367,7 @@ class MessageSerializer(serializers.ModelSerializer):
         return {
             'id': receiver.id,
             'username': receiver.username,
+            'realname': receiver.realName,
             'avatar': receiver.avatar.url if receiver.avatar else None,
             'online': getattr(receiver, 'isOnline', False)
         }

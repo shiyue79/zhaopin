@@ -72,6 +72,7 @@ class MessageViewSet(viewsets.ViewSet):
                         'id': other.id,
                         'account': data['other_account'],
                         'username': other.username,
+                        'realname': other.realName,
                         'avatar': other.avatar.url if other.avatar else None,
                         'online': getattr(other, 'isOnline', False)
                     },

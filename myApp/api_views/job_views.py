@@ -5,10 +5,9 @@ from rest_framework.decorators import action
 from django.http import JsonResponse
 from django.core.cache import cache
 from django.core.paginator import Paginator
-from ..models import User, Joblist, Employer, Industry, History,Favorite
+from ..models import User, Joblist, Employer, Industry, History,Favorite,Application
 from ..serializers import JobSerializer
 import hashlib
-from ..utils import getTableData, getCompanyInfo
 
 
 class JobViewSet(viewsets.ViewSet):
@@ -574,13 +573,30 @@ class JobViewSet(viewsets.ViewSet):
                 industry_name = job.industry
                 if job.industry:
                     try:
-                        industry_obj = Industry.objects.get(code=job.industry)
-                        industry_name = industry_obj.name
+                        # 按 $ 分割层级代码
+                        code_list = job.industry.split('$')
+                        name_list = []
+                        for code in code_list:
+                            code = code.strip()
+                            if code:
+                                industry_obj = Industry.objects.get(code=code)
+                                name_list.append(industry_obj.name)
+                        industry_name = ' > '.join(name_list) if name_list else job.industry
                     except Industry.DoesNotExist:
                         industry_name = job.industry
 
                 company_name = job.company.name if job.company else ''
                 staff_name = job.staff.realName if job.staff else ''
+
+                # 统计数据
+                views_count = History.objects.filter(job=job).count()
+                applications_count = Application.objects.filter(job=job).count()
+                favorites_count = Favorite.objects.filter(job=job).count()
+                # 优质候选人：面试通过的候选人数量
+                candidates_count = Application.objects.filter(
+                    job=job,
+                    status='finalPass'
+                ).count()
 
                 job_data = {
                     'id': job.id,
@@ -602,6 +618,10 @@ class JobViewSet(viewsets.ViewSet):
                     'status': job.status,
                     'company': company_name,
                     'staff': staff_name,
+                    'views': views_count,
+                    'applications': applications_count,
+                    'favorites': favorites_count,
+                    'candidates': candidates_count,
                 }
 
                 job_list.append(job_data)
@@ -829,7 +849,7 @@ class JobViewSet(viewsets.ViewSet):
             employer = Employer.objects.get(username=username)
             id = request.data.get('id')
             job = Joblist.objects.get(id=id)
-            if job.company_id != employer.company:
+            if job.company != employer.company:
                 return JsonResponse({
                     'code': 403,
                     'msg': '无权查看此岗位',
